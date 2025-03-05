@@ -2,10 +2,9 @@ import cv2
 import pytesseract
 from PIL import Image
 import numpy as np
-from sklearn.cluster import KMeans
+import json
 
-# Укажите путь к Tesseract, если он не добавлен в PATH
-# pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 def process_image(image_path):
     # Загрузка изображения
@@ -29,26 +28,53 @@ def process_image(image_path):
     elements = []
 
     # Обрабатываем каждый контур
-    for contour in contours:
+    for i, contour in enumerate(contours):
         x, y, w, h = cv2.boundingRect(contour)
+        
+        # Вырезаем область изображения, соответствующую контуру
+        roi = image[y:y+h, x:x+w]
+        
+        # Распознаем текст в области
+        text = pytesseract.image_to_string(roi)
+
+        # Добавляем элемент в список
         elements.append({
             "type": "div",
+            "id": f"block_{i}",  # Уникальный идентификатор
             "position": {"x": x, "y": y, "width": w, "height": h},
-            "styles": {"background_color": "#FFFFFF"}  # Белый цвет по умолчанию
+            "styles": {
+                "background_color": "#FFFFFF",  # Белый цвет по умолчанию
+                "border_radius": "0px",  # Скругление углов
+                "padding": "0px"  # Отступы внутри элемента
+            },
+            "children": [
+                {
+                    "type": "text",
+                    "content": text.strip(),  # Распознанный текст
+                    "styles": {
+                        "font_size": "16px",
+                        "font_family": "Arial",
+                        "color": "#000000",
+                        "text_align": "left"
+                    }
+                }
+            ]
         })
-
-    # Отладочная информация
-    print(f"Найдено контуров: {len(contours)}")
-    print(f"Элементы: {elements}")
 
     # Возвращаем структуру данных
     return {
         "layout": {
             "width": image.shape[1],
             "height": image.shape[0],
-            "elements": elements  # Убедитесь, что элементы добавлены в ключ "elements"
+            "background_color": "#FFFFFF",  # Цвет фона макета
+            "elements": elements
         }
     }
+
+def save_to_json(data, output_file="output.json"):
+    with open(output_file, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+    print(f"Данные сохранены в файл {output_file}")
 
 def generate_html_css(layout):
     html = []
@@ -81,16 +107,10 @@ def generate_html_css(layout):
 
 if __name__ == '__main__':
     # Путь к изображению
-    image_path = 'images/website_template.png'  # Замените на путь к вашему изображению
+    image_path = 'images/website_template.png' # Замените на путь к вашему изображению
 
     # Обработка изображения
     layout = process_image(image_path)
 
-    # Генерация HTML и CSS
-    html_css = generate_html_css(layout)
-
-    # Сохранение результата в файл
-    with open('output.html', 'w', encoding='utf-8') as f:
-        f.write(html_css)
-
-    print("HTML и CSS успешно сгенерированы и сохранены в файл output.html")
+    # Сохранение результата в JSON
+    save_to_json(layout)

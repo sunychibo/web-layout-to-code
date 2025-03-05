@@ -26,3 +26,4 @@ pycache/
 
 # Сгенерированные файлы
 output.html
+output.json
