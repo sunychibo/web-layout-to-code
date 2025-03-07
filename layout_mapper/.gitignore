@@ -1,0 +1,36 @@
+# Файлы, создающиеся при работе Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pdb
+*.swp
+*.swo
+
+# Логи и временные файлы
+*.log
+*.tmp
+
+# Файлы окружения и установок IDE/редакторов
+.vscode/
+.idea/
+*.sublime-workspace
+
+# Файл настроек виртуального окружения (venv)
+venv/
+ENV/
+env/
+.venv/
+
+# Файлы OS/служебные
+.DS_Store
+Thumbs.db
+
+# Папки и файлы сборки (если используются)
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Если не хотите коммитить выходной JSON (опционально):
+output-coordinates.json
