@@ -1,50 +1,124 @@
 import cv2
 import numpy as np
 
-def find_blocks_and_build_tree(image):
+def find_blocks_and_build_tree(image, params=None):
     """
-    Наивная функция:
-    1) Переводит изображение в серый формат.
-    2) Применяет простую бинарную сегментацию (threshold).
-    3) Находит контуры (cv2.findContours).
-    4) Для каждого контура вычисляет boundingRect и сохраняет в список.
-    5) Строит иерархию (layout -> children).
+    Функция учитывает параметры из 'params' (dict):
+      - threshold_method: 'fixed', 'otsu', 'adaptive'
+      - threshold_value: (int) [0..255]
+      - max_value: (int) значение заливки [1..255]
+      - adaptive_block_size: (int) размер окна при adaptiveThreshold
+      - adaptive_C: (int) константа при adaptiveThreshold
+      - morphology_kernel_size: (int) размер ядра морфологии
+      - morphology_iterations: (int) кол-во итераций морфологических оп-й
+      - min_block_width, min_block_height
+      - retrieval_mode: 'RETR_EXTERNAL' / 'RETR_TREE' / ...
+      - approx_method: 'CHAIN_APPROX_SIMPLE', ...
+      - min_area, max_area
+      - approx_polygons: (bool) аппроксимация контуров cv2.approxPolyDP
+
+    Возвращает dict с иерархией найденных блоков.
+    """
+    if params is None:
+        params = {}
+
+    # Извлекаем
+    threshold_method = params.get("threshold_method", "fixed")
+    threshold_value = params.get("threshold_value", 127)
+    max_value = params.get("max_value", 255)
+    adaptive_block_size = params.get("adaptive_block_size", 11)
+    adaptive_C = params.get("adaptive_C", 2)
+    morphology_kernel_size = params.get("morphology_kernel_size", 3)
+    morphology_iterations = params.get("morphology_iterations", 1)
+    min_block_width = params.get("min_block_width", 20)
+    min_block_height = params.get("min_block_height", 20)
+    retrieval_mode_str = params.get("retrieval_mode", "RETR_EXTERNAL")
+    approx_method_str = params.get("approx_method", "CHAIN_APPROX_SIMPLE")
+    min_area = params.get("min_area", 0)
+    max_area = params.get("max_area", 999999)
+    approx_polygons = params.get("approx_polygons", False)
+
+    # Конвертация retrieval_mode_str в константу OpenCV
+    if retrieval_mode_str == "RETR_EXTERNAL":
+        retrieval_mode = cv2.RETR_EXTERNAL
+    elif retrieval_mode_str == "RETR_TREE":
+        retrieval_mode = cv2.RETR_TREE
+    elif retrieval_mode_str == "RETR_CCOMP":
+        retrieval_mode = cv2.RETR_CCOMP
+    else:
+        retrieval_mode = cv2.RETR_LIST
+
+    # Конвертация approx_method_str в константу OpenCV
+    if approx_method_str == "CHAIN_APPROX_NONE":
+        approx_method = cv2.CHAIN_APPROX_NONE
+    elif approx_method_str == "CHAIN_APPROX_TC89_L1":
+        approx_method = cv2.CHAIN_APPROX_TC89_L1
+    elif approx_method_str == "CHAIN_APPROX_TC89_KCOS":
+        approx_method = cv2.CHAIN_APPROX_TC89_KCOS
+    else:
+        approx_method = cv2.CHAIN_APPROX_SIMPLE
+
+    print("[processing.py] DEBUG: Started find_blocks_and_build_tree with params =", params)
     
-    Возвращает структуру данных, которую потом сериализуем в JSON.
-    """
-    # Шаг 1: перевод в grayscale
+    # 1) Перевод в grayscale
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-    # Шаг 2: простое бинарное пороговое преобразование
-    # Обычно порог ~127, но можно подбирать в зависимости от яркости
-    _, thresh = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY_INV)
+    # 2) Выбор метода пороговой бинаризации
+    if threshold_method == "fixed":
+        # Простой фиксированный порог
+        _, thresh = cv2.threshold(gray, threshold_value, max_value, cv2.THRESH_BINARY_INV)
 
-    # Шаг 3: ищем контуры
-    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    elif threshold_method == "otsu":
+        # OTSU автоматически определяет оптимальный порог
+        _, thresh = cv2.threshold(gray, 0, max_value, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
 
-    # Для хранения результатов (bounding box каждой найденной области)
+    else:  # "adaptive"
+        # Адаптивный метод (GAUSSIAN_C или MEAN_C)
+        # Ниже – пример с GAUSSIAN_C
+        thresh = cv2.adaptiveThreshold(
+            gray,
+            max_value,
+            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,  # можно поменять на MEAN_C
+            cv2.THRESH_BINARY_INV,
+            adaptive_block_size,
+            adaptive_C
+        )
+
+    # 3) Морфология (например, закрытие разрывов)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (morphology_kernel_size, morphology_kernel_size))
+    # Можно применять dilate, erode, open, close – по задаче, сейчас делаем close итерации раз
+    for _ in range(morphology_iterations):
+        thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
+
+    # 4) Поиск контуров с заданным retrieval_mode и approx_method
+    contours, _ = cv2.findContours(thresh, retrieval_mode, approx_method)
+
+    # 5) Проходимся по контурам
     blocks = []
-
-    # Шаг 4: извлекаем boundingRect у каждого контура
     for c in contours:
+        # Если включена аппроксимация многоугольников
+        if approx_polygons:
+            epsilon = 0.01 * cv2.arcLength(c, True)
+            c = cv2.approxPolyDP(c, epsilon, True)
+
         x, y, w, h = cv2.boundingRect(c)
 
-        # Фильтруем слишком маленькие блоки (можно подбирать порог)
-        if w > 20 and h > 20:
-            # Сохраняем координаты углов (x,y) (x+w,y) (x+w, y+h) (x, y+h)
-            corners = [
-                [int(x), int(y)],
-                [int(x + w), int(y)],
-                [int(x + w), int(y + h)],
-                [int(x), int(y + h)]
-            ]
-            blocks.append({
-                "coordinatesXY": corners,
-                "bbox": (x, y, w, h)  # Для удобства определения вложенности
-            })
+        # Фильтрация по ширине/высоте
+        if w >= min_block_width and h >= min_block_height:
+            area = w * h
+            if area >= min_area and area <= max_area:
+                corners = [
+                    [int(x), int(y)],
+                    [int(x + w), int(y)],
+                    [int(x + w), int(y + h)],
+                    [int(x), int(y + h)]
+                ]
+                blocks.append({
+                    "coordinatesXY": corners,
+                    "bbox": (x, y, w, h)
+                })
 
-    # Для упрощения считаем, что "layout" - это boundingRect по всему изображению
-    # (или самый большой блок, если хочется). Здесь пойдём по пути boundingRect всего изображения:
+    # 6) layout = boundingRect всего изображения
     h_img, w_img = image.shape[:2]
     layout_corners = [[0, 0], [w_img, 0], [w_img, h_img], [0, h_img]]
     layout_dict = {
@@ -52,45 +126,24 @@ def find_blocks_and_build_tree(image):
         "children": {}
     }
 
-    # Шаг 5: определение вложенности
-    # У нас есть блоки, у каждого блок-а bbox. 
-    # Проверим, какие блоки находятся целиком в layout, а потом иерархически распределим.
-    
-    # Функция проверки, что все углы A внутри углов B (здесь можно сделать проверку точек внутри bbox).
+    # Вложенность (логика, как прежде)
     def is_inside(bbox_a, bbox_b):
-        """
-        Проверяем, все ли углы bbox_a внутри bbox_b (по boundingRect).
-        """
-        (Ax, Ay, Aw, Ah) = bbox_a
-        (Bx, By, Bw, Bh) = bbox_b
-        if Ax >= Bx and Ay >= By and (Ax + Aw) <= (Bx + Bw) and (Ay + Ah) <= (By + Bh):
-            return True
-        return False
+        Ax, Ay, Aw, Ah = bbox_a
+        Bx, By, Bw, Bh = bbox_b
+        return (Ax >= Bx and Ay >= By 
+                and (Ax + Aw) <= (Bx + Bw) 
+                and (Ay + Ah) <= (By + Bh))
 
-    # Разместим все блоки, которые реально внутри layout.
-    # Можно строить дерево на основе сортировки по размеру bbox.
-    # Для простоты сделаем одноуровневую вложенность: все блоки -> children layout.
-    # И/или рекурсивно распределять: если один блок внутри другого.
-    
-    # Отсортируем блоки по убыванию площади, чтобы сначала обрабатывать большие.
+    # Сортируем по убыванию площади
     blocks = sorted(blocks, key=lambda b: b["bbox"][2] * b["bbox"][3], reverse=True)
 
-    # Чтобы хранить итоговую структуру
     final_blocks = []
 
-    # Функция рекурсивного добавления
     def add_block_recursively(block, parents_list):
-        """
-        Пытается добавить блок как потомка к уже имеющимся элементам,
-        если он полностью внутри. Иначе возвращается, что не добавлен.
-        """
         for p in parents_list:
-            # Если все углы этого блока внутри p
             if is_inside(block["bbox"], p["bbox"]):
-                # Ищем дальше среди детей p (p["children"])
                 added = add_block_recursively(block, p["children_list"])
                 if not added:
-                    # Не получилось добавить глубже, значит добавим его прямо здесь
                     p["children_list"].append({
                         "coordinatesXY": block["coordinatesXY"],
                         "bbox": block["bbox"],
@@ -99,16 +152,10 @@ def find_blocks_and_build_tree(image):
                 return True
         return False
 
-    # Будем формировать список "корневых" блоков
     root_blocks = []
-
-    # Последовательно пытаемся вставить каждый блок в уже существующую иерархию
     for block in blocks:
-        # Проверяем, лежит ли он внутри layout
         if is_inside(block["bbox"], (0, 0, w_img, h_img)):
-            # Пробуем добавить его рекурсивно в root_blocks
             added = add_block_recursively(block, root_blocks)
-            # Если не добавлен, значит он сам становится root (не вложен ни в один из уже имеющихся)
             if not added:
                 root_blocks.append({
                     "coordinatesXY": block["coordinatesXY"],
@@ -116,21 +163,7 @@ def find_blocks_and_build_tree(image):
                     "children_list": []
                 })
 
-    # Теперь у нас есть список "root_blocks", которые целиком лежат в layout
-    # но при этом они могут иметь рекурсивные children. Нужно превратить это в JSON-структуру.
-
     def convert_to_json_structure(blocks_list, prefix="block"):
-        """
-        Превращаем вложенные списки в структуру вида:
-        {
-          "block_00": {
-            "coordinatesXY": ...,
-            "children": {
-              ...
-            }
-          }
-        }
-        """
         result = {}
         idx = 0
         for b in blocks_list:
@@ -146,7 +179,6 @@ def find_blocks_and_build_tree(image):
     children_json = convert_to_json_structure(root_blocks, prefix="block")
     layout_dict["children"] = children_json
 
-    # Окончательная структура
     final_json = {
         "layout": layout_dict
     }

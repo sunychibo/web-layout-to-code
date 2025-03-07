@@ -1,0 +1,17 @@
+{
+    "threshold_method": "fixed",
+    "threshold_value": 127,
+    "max_value": 255,
+    "adaptive_block_size": 11,
+    "adaptive_C": 2,
+    "morphology_kernel_size": 3,
+    "morphology_iterations": 1,
+    "min_block_width": 20,
+    "min_block_height": 20,
+    "retrieval_mode": "RETR_EXTERNAL",
+    "approx_method": "CHAIN_APPROX_SIMPLE",
+    "min_area": 0,
+    "max_area": 999999,
+    "approx_polygons": false
+}
+  
