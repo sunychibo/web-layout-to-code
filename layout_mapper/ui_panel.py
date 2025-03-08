@@ -32,8 +32,8 @@ def render_control_panel():
         
         threshold_method = st.selectbox(
             "Метод бинаризации (threshold_method)",
-            options=["fixed", "otsu", "adaptive"],
-            index=["fixed", "otsu", "adaptive"].index(p.get("threshold_method", "fixed"))
+            options=["fixed", "otsu", "triangle", "adaptive_mean", "adaptive_gaussian"],
+            index=["fixed", "otsu", "triangle", "adaptive_mean", "adaptive_gaussian"].index(p.get("threshold_method", "fixed"))
         )
 
         threshold_value = st.slider(
