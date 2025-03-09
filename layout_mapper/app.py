@@ -57,10 +57,7 @@ def main():
                 st.warning("Нет исходного изображения в session_state.original_image")
             else:
                 # Аннотируем
-                annotated_img = annotate_image(st.session_state.original_image,
-                                               st.session_state.result_json,
-                                               color=(0, 0, 255),
-                                               thickness=2)
+                annotated_img = annotate_image(st.session_state.original_image, st.session_state.result_json, (255, 0, 127), 1)
                 cv2.imwrite("annotated_result.png", annotated_img)
                 st.success("Результат сохранён в файл annotated_result.png")
 

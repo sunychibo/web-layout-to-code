@@ -1,0 +1,16 @@
+{
+    "threshold_method":"adaptive_gaussian",
+    "threshold_value":150,
+    "max_value":255,
+    "adaptive_block_size":3,
+    "adaptive_C":1,
+    "morphology_kernel_size":7,
+    "morphology_iterations":1,
+    "min_block_width":0,
+    "min_block_height":0,
+    "retrieval_mode":"RETR_TREE",
+    "approx_method":"CHAIN_APPROX_TC89_KCOS",
+    "min_area":0,
+    "max_area":999999,
+    "approx_polygons":false
+}

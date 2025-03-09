@@ -9,7 +9,7 @@ IMAGE_FILE = 'website_template_3.png'
 # Итоговое изображение с нарисованными контурами и подписями
 OUTPUT_FILE = 'annotated_result.png'
 
-def draw_block_recursively(image, block_dict, block_name, color=(0, 0, 255), thickness=2):
+def draw_block_recursively(image, block_dict, block_name, color, thickness):
     """
     Рекурсивно рисует блок и его вложенные блоки на изображении.
     
@@ -26,12 +26,13 @@ def draw_block_recursively(image, block_dict, block_name, color=(0, 0, 255), thi
     # Рисуем многоугольник (замкнутый контур)
     cv2.polylines(image, [coords_array], isClosed=True, color=color, thickness=thickness)
 
+
     # Чтобы красиво расположить текст, возьмём первую вершину (или любую)
     x_text, y_text = coords[0]
 
-    # Подпишем блок: блок-ид + координаты
-    # Можно сделать более кратко или наоборот подробнее
-    text = f"{block_name} {coords}"
+    # Подпишем блок: блок-id + координаты
+    # text = f"{block_name} {coords}"
+    text = f"{block_name}"
     cv2.putText(
         image,
         text,
