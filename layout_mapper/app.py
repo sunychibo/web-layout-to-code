@@ -3,8 +3,10 @@ import json
 import cv2
 import numpy as np
 
-from processing import find_blocks_and_build_tree
-from render_bboxes import annotate_image
+from modules.opencv_processing import find_blocks_and_build_tree
+from modules.color_processing import detect_background
+from modules.text_recognition_processing import extract_text
+from modules.render_bboxes import annotate_image
 from ui_panel import render_control_panel
 
 def main():
@@ -36,8 +38,24 @@ def main():
     if st.session_state.original_image is not None:
         if st.button("Process Image"):
 
-            # Считываем изображение
+            def extract_text_and_color(block, image, parent_key=""):
+                for key, data in block.items():
+                    # Определяем фон
+                    bg_info = detect_background(data, image)
+                    data.update(bg_info)
+                    
+                    # Распознаем текст
+                    text_info = extract_text(data, image)
+                    data.update(text_info)
+                    
+                    # Обрабатываем детей
+                    if data["children"]:
+                        extract_text_and_color(data["children"], image, f"{parent_key}_{key}")
+
+            # Считываем изображение и идентифицируем структурные блоки
             result_json = find_blocks_and_build_tree(st.session_state.original_image, get_params())
+            # Для каждого блока - определяем фон, распознаём текст
+            extract_text_and_color(result_json["block_00"]["children"], st.session_state.original_image)
             st.session_state.result_json = result_json
 
             # Сохраняем JSON локально
@@ -57,7 +75,7 @@ def main():
                 st.warning("Нет исходного изображения в session_state.original_image")
             else:
                 # Аннотируем
-                annotated_img = annotate_image(st.session_state.original_image, st.session_state.result_json, (255, 0, 127), 1)
+                annotated_img = annotate_image(st.session_state.original_image, st.session_state.result_json, (255, 0, 127), 1) # BGR
                 cv2.imwrite("annotated_result.png", annotated_img)
                 st.success("Результат сохранён в файл annotated_result.png")
 
