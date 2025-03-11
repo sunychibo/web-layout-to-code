@@ -16,7 +16,9 @@
 
 ```bash
 git clone https://github.com/sunychibo/web-layout-to-code.git
-cd layout-mapper
+```
+```bash
+cd web-layout-to-code
 ```
 
 ### 1.2. Создание виртуального окружения (рекомендуется)
