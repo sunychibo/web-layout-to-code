@@ -4,9 +4,10 @@ import cv2
 import numpy as np
 
 from modules.opencv_processing import find_blocks_and_build_tree
-from modules.color_processing import detect_background
+from modules.color_processing import detect_colors
 from modules.text_recognition_processing import extract_text
 from modules.render_bboxes import annotate_image
+from modules.html_processing import generate_html
 from ui_panel import render_control_panel
 
 def main():
@@ -17,7 +18,8 @@ def main():
     if "original_image" not in st.session_state:
         st.session_state.original_image = None
 
-    st.title("Layout Mapper (OpenCV + Streamlit)")
+    st.title("Layout Mapper")
+    st.subheader("Based on: OpenCV, EasyOSR, Scikit-learn")
 
     # 1. Загрузка изображения
     uploaded_img = st.file_uploader("Загрузите изображение", type=["png", "jpg", "jpeg"])
@@ -41,7 +43,7 @@ def main():
             def extract_text_and_color(block, image, parent_key=""):
                 for key, data in block.items():
                     # Определяем фон
-                    bg_info = detect_background(data, image)
+                    bg_info = detect_colors(data, image)
                     data.update(bg_info)
                     
                     # Распознаем текст
@@ -84,6 +86,24 @@ def main():
                     caption="Annotated image",
                     use_container_width=True
                 )
+
+    # 7. Кнопка "Generate HTML Collection"
+    if st.session_state.result_json is not None:
+        if st.button("Generate HTML Collection"):
+            if 'result_json' in st.session_state:
+                # Генерируем HTML файл
+                generate_html(st.session_state.result_json)
+                
+                # Показываем превью
+                st.success("HTML файл успешно сгенерирован!")
+                st.subheader("Preview blocks.html")
+                
+                # Читаем и отображаем содержимое файла
+                with open("blocks.html", "r", encoding="utf-8") as f:
+                    html_content = f.read()
+                    st.html(html_content)
+            else:
+                st.warning("Сначала обработайте изображение через 'Process Image'!")
 
 if __name__ == "__main__":
     main()
