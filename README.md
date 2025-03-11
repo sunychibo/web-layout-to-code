@@ -15,7 +15,7 @@
 Скопируйте файлы проекта к себе в любую удобную папку (например, `layout-mapper/`).
 
 ```bash
-git clone https://github.com/sunychibo/layout-mapper.git
+git clone https://github.com/sunychibo/web-layout-to-code.git
 cd layout-mapper
 ```
 
